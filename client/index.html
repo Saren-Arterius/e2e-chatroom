@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en" ng-app>
+
+<head>
+  <title>Chat Example</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/bootstrap-responsive.min.css">
+  <style>
+    body {
+      padding-top: 60px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container" ng-controller="ChatController">
+    <div class="navbar navbar-fixed-top navbar-inverse">
+      <div class="navbar-inner">
+        <div class="pull-right">
+          <a href="https://c9.io" class="brand">Cloud9 IDE</a>
+        </div>
+      </div>
+    </div>
+    <div class="page-header">
+      <h1>Chat Example</h1>
+    </div>
+    <div class="row">
+      <div class="span9">
+        <table class="table table-striped table-bordered">
+          <thead>
+            <tr>
+              <th class="span2">Time</th>
+              <th class="span7">Text</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="msg in messages">
+              <td class="span2" ng-bind="msg.time"></td>
+              <td class="span7" ng-bind="msg.text"></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="row controls">
+          <form ng-submit="send()">
+            <div class="span2"><input type="text" class="input-block-level" ng-model="room" ng-change="setRoom()" placeholder="Room"></div>
+            <div class="span2"><input type="text" class="input-block-level" ng-model="psk" ng-change="setPSK()" placeholder="PSK"></div>
+            <div class="input-append span5">
+              <input type="text" class="span6" ng-model="text" placeholder="Message">
+              <input type="submit" class="span1 btn btn-primary" value="Send" ng-disabled="!text || !pskHash">
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/jquery.min.js"></script>
+  <script src="/js/bootstrap.min.js"></script>
+  <script src="/js/angular.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.min.js"></script>
+
+  <script>
+    function ChatController($scope) {
+      var socket = io.connect();
+
+      $scope.messages = [];
+      $scope.room = 'DefaultRoom';
+      $scope.psk = 'SecretKey';
+      $scope.text = '';
+      $scope.pskHash = '';
+      var delay;
+
+      socket.on('connect', function() {
+        $scope.setRoom();
+      });
+
+      socket.on('message', function(msg) {
+        var decrypted = CryptoJS.AES.decrypt(msg.text, $scope.pskHash);
+        console.log(decrypted);
+        $scope.messages.push({
+          time: msg.time,
+          text: decrypted.toString(CryptoJS.enc.Utf8)
+        });
+        $scope.$apply();
+      });
+
+      socket.on('cls', function() {
+        $scope.messages = [];
+        $scope.$apply();
+      })
+
+      $scope.send = function send() {
+        var encrypted = CryptoJS.AES.encrypt($scope.text, $scope.pskHash);
+        console.log('Sending message:', encrypted.toString());
+        socket.emit('message', encrypted.toString());
+        $scope.text = '';
+      };
+
+      $scope.setRoom = function setRoom() {
+        $scope.setPSK();
+      };
+
+      $scope.setPSK = function setPSK() {
+        clearTimeout(delay);
+        $scope.pskHash = '';
+        delay = setTimeout(function() {
+          $scope.pskHash = CryptoJS.PBKDF2($scope.psk, $scope.room, {
+            keySize: 512 / 32,
+            iterations: 5000
+          }).toString();
+          socket.emit('room', $scope.room);
+        }, 500);
+      };
+    }
+  </script>
+</body>
+
+</html>
