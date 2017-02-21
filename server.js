@@ -32,14 +32,6 @@ io.on('connection', function(socket) {
     socket.emit('message', data);
   });
 
-  sockets.forEach(function(socket) {
-    socket.get('room', function(err, room) {
-      if (room === targetRoom) {
-        socket.emit(event, data);
-      }
-    });
-  });
-
   sockets.push(socket);
 
   socket.on('disconnect', function() {
